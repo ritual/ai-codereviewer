@@ -106,16 +106,28 @@ function analyzeCode(parsedDiff, prDetails) {
     });
 }
 function createPrompt(file, chunk, prDetails) {
-    return `Your task is to review pull requests. Instructions:
+    const botName = core.getInput("bot_name");
+    const rules = core.getInput("rules");
+    const rulesPrompt = rules === ""
+        ? ""
+        : `Your review will *only* ensure the following rules are followed:
+${rules}`;
+    return `Your name is ${botName}. Your task is to review pull requests. ${rulesPrompt}
+
+Here are your instructions regarding the format and the style of the review:
 - Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
 - Do not give positive comments or compliments.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
 - Write the comment in GitHub Markdown format.
+- You can suggest a fix in a reviewComment if you want to by using a \`\`\`suggestion\`\`\` code block (with proper whitespace indentation).
 - Use the given description only for the overall context and only comment the code.
+- Only return the most important issues.
 - IMPORTANT: NEVER suggest adding comments to the code.
+- IMPORTANT: Do not make suggestions related to code style.
+- IMPORTANT: Do not make suggestions related to TODO comments.
 
 Review the following code diff in the file "${file.to}" and take the pull request title and description into account when writing the response.
-  
+
 Pull request title: ${prDetails.title}
 Pull request description:
 
@@ -192,7 +204,8 @@ function main() {
         const prDetails = yield getPRDetails();
         let diff;
         const eventData = JSON.parse((0, fs_1.readFileSync)((_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0 ? _a : "", "utf8"));
-        if (eventData.action === "opened") {
+        let actionNames = ["opened", "labeled", "reopened"];
+        if (actionNames.includes(eventData.action)) {
             diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
         }
         else if (eventData.action === "synchronize") {
